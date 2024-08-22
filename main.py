@@ -36,10 +36,10 @@ if response.status_code == 200:
     logging.info("Data fetched successfully.")
 elif response.status_code == 400:
     logging.error("Bad Request: The server could not understand the request.")
-    sys.exit(1)  # Exit the program with status code 1
+    sys.exit(1) # Exit on failure
 else:
     logging.error(f"Failed to fetch data. HTTP Status Code: {response.status_code}")
-    sys.exit(1)  # Exit the program with status code 1
+    sys.exit(1)  # Exit on failure
 
 # Fact table with changing data
 fact_schema = StructType([
