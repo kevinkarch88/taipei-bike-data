@@ -1,4 +1,4 @@
-from dagster import op, job, schedule, in_process_executor
+from dagster import op, job, schedule, in_process_executor, Definitions
 import logging
 from dateutil import parser
 import datetime
@@ -133,6 +133,13 @@ def bike_pipeline():
 @schedule(cron_schedule="*/1 * * * *", job=bike_pipeline, execution_timezone="UTC")
 def minute_schedule(_context):
     return {}
+
+
+# definitions needed to get scheduler to work in UI
+defs = Definitions(
+    jobs=[bike_pipeline],
+    schedules=[minute_schedule]
+)
 
 
 if __name__ == "__main__":
