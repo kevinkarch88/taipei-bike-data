@@ -3,7 +3,7 @@
 This project is a pipeline for processing and analyzing bike station data from the Taipei YouBike system, sourced from the CityBikes API.
 The pipeline uses Pyspark for data processing, Dagster for scheduling, and Docker for containerization.
 
-# Architecture [DRAFT]
+# Architecture
 Two tables are used to store the data.
 The dimension table has the information about each individual station with primary key station_id, longitude, latitude, name, district, and address.
 The fact table has the updated status of the bike with primary key station_id, timestamp, free_bikes, and empty_slots.
@@ -21,3 +21,9 @@ In a third terminal, run 'dagster schedule start' to start the pipeline, and you
 # Docker
 To build the image, do 'docker build -t taipei-bike-data .'
 To run the container, do 'docker run -p 3000:3000 taipei-bike-data'
+
+# GCP Next Steps [DRAFT]
+Save program instead of using container (GCS)
+Change saving of CSVs to loading into a database (BigQuery)
+Run job (DataProc)
+Orchestrate jobs (Composter)
