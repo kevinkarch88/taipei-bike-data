@@ -1,4 +1,5 @@
-dagster
 pyspark
 requests
 python-dateutil
+google-cloud-bigquery
+pandas
