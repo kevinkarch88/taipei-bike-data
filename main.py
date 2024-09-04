@@ -1,4 +1,6 @@
 import logging
+from google.cloud import bigquery
+from google.api_core.exceptions import NotFound
 from dateutil import parser
 import datetime
 import requests
@@ -13,6 +15,38 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s - %(fu
 os.environ['PYSPARK_PYTHON'] = sys.executable
 os.environ['PYSPARK_DRIVER_PYTHON'] = sys.executable
 
+bq_client = bigquery.Client()
+
+
+def create_or_update_table(table_id, schema):
+    try:
+        bq_client.get_table(table_id)  # Check if the table exists
+        logging.info(f"Table {table_id} already exists.")
+    except NotFound:
+        table = bigquery.Table(table_id, schema=schema)
+        bq_client.create_table(table)
+        logging.info(f"Table {table_id} created.")
+
+
+def create_bigquery_schema():
+    fact_schema = [
+        bigquery.SchemaField("station_id", "STRING", mode="REQUIRED"),
+        bigquery.SchemaField("timestamp", "TIMESTAMP", mode="REQUIRED"),
+        bigquery.SchemaField("free_bikes", "INTEGER", mode="REQUIRED"),
+        bigquery.SchemaField("empty_slots", "INTEGER", mode="REQUIRED"),
+    ]
+
+    dim_schema = [
+        bigquery.SchemaField("station_id", "STRING", mode="REQUIRED"),
+        bigquery.SchemaField("latitude", "FLOAT", mode="REQUIRED"),
+        bigquery.SchemaField("longitude", "FLOAT", mode="REQUIRED"),
+        bigquery.SchemaField("name", "STRING", mode="REQUIRED"),
+        bigquery.SchemaField("district", "STRING", mode="REQUIRED"),
+        bigquery.SchemaField("address", "STRING", mode="REQUIRED"),
+    ]
+
+    return fact_schema, dim_schema
+
 
 def fetch_bike_data():
     url = "https://api.citybik.es/v2/networks/youbike-new-taipei"
@@ -25,32 +59,66 @@ def fetch_bike_data():
         return None
 
 
-def process_bike_data(data, cached_dim_data):
-    spark = SparkSession.builder.appName("BikeStationDataProcessing").getOrCreate()
+def validate_schema(df_schema, table_schema):
+    if set(df_schema) != set(table_schema):
+        logging.error("Schema mismatch in data frames.")
+        return False
+    return True
 
+
+def create_or_update_dataset(dataset_id):
+    try:
+        bq_client.get_dataset(dataset_id)
+        logging.info(f"Dataset {dataset_id} already exists.")
+    except NotFound:
+        dataset = bigquery.Dataset(dataset_id)
+        bq_client.create_dataset(dataset, timeout=30)
+        logging.info(f"Dataset {dataset_id} created.")
+
+
+def create_spark_schema():
     fact_schema = StructType([
-        StructField("id", StringType(), True),
-        StructField("timestamp", TimestampType(), True),
-        StructField("free_bikes", IntegerType(), True),
-        StructField("empty_slots", IntegerType(), True)
+        StructField("station_id", StringType(), False),
+        StructField("timestamp", TimestampType(), False),
+        StructField("free_bikes", IntegerType(), False),
+        StructField("empty_slots", IntegerType(), False)
     ])
 
     dim_schema = StructType([
-        StructField("id", StringType(), True),
-        StructField("latitude", DoubleType(), True),
-        StructField("longitude", DoubleType(), True),
-        StructField("name", StringType(), True),
-        StructField("district", StringType(), True),
-        StructField("address", StringType(), True)
+        StructField("station_id", StringType(), False),
+        StructField("latitude", DoubleType(), False),
+        StructField("longitude", DoubleType(), False),
+        StructField("name", StringType(), False),
+        StructField("district", StringType(), False),
+        StructField("address", StringType(), False)
     ])
 
+    return fact_schema, dim_schema
+
+
+def process_bike_data(data, cached_dim_data, dataset_id):
+    spark = SparkSession.builder \
+        .appName("BikeStationDataProcessing") \
+        .config("spark.jars.packages", "com.google.cloud.spark:spark-bigquery-with-dependencies_2.12:0.30.0") \
+        .getOrCreate()
+
+    # Create Spark schemas
+    spark_fact_schema, spark_dim_schema = create_spark_schema()
+
+    # Create BigQuery schemas
+    fact_schema, dim_schema = create_bigquery_schema()
+
+    # Create or update the BigQuery tables
+    create_or_update_table(f"{dataset_id}.fact_table", fact_schema)
+    create_or_update_table(f"{dataset_id}.dim_table", dim_schema)
+
     fact_data_list = []
-    new_dim_data_list = []
+    dim_data_list = []
 
     for station in data['network']['stations']:
         station_id = station.get("id")
 
-        # Process fact table data
+        # Fact table data
         timestamp_str = station.get("timestamp", datetime.datetime.utcnow().isoformat())
         timestamp = parser.isoparse(timestamp_str) if timestamp_str else datetime.datetime.utcnow()
         timestamp = timestamp.replace(second=0, microsecond=0)
@@ -60,7 +128,7 @@ def process_bike_data(data, cached_dim_data):
 
         fact_data_list.append((station_id, timestamp, free_bikes, empty_slots))
 
-        # Process dimension table only if station_id is new
+        # Dimension table data (only for new stations)
         if station_id not in cached_dim_data:
             latitude = round(station.get("latitude", 0.0), 4)
             longitude = round(station.get("longitude", 0.0), 4)
@@ -70,44 +138,54 @@ def process_bike_data(data, cached_dim_data):
             english_district = en_info.get("district", "").replace(" Dist", "").strip()
             english_address = en_info.get("address", "").strip()
 
-            new_dim_data_list.append((
+            dim_data_list.append((
                 station_id, latitude, longitude, english_name, english_district, english_address
             ))
 
             # Log the new station
             logging.info(f"New station found: {english_name} at {datetime.datetime.utcnow()}")
 
-    # Convert lists to DataFrames
-    fact_df = spark.createDataFrame(fact_data_list, schema=fact_schema)
-    if new_dim_data_list:
-        dim_df = spark.createDataFrame(new_dim_data_list, schema=dim_schema)
+    # Convert lists to Spark DataFrames using the Spark schema
+    fact_df = spark.createDataFrame(fact_data_list, schema=spark_fact_schema)
+    dim_df = spark.createDataFrame(dim_data_list, schema=spark_dim_schema) if dim_data_list else None
 
-        # Save dimension DataFrame to CSV
-        dim_filename = f"dim_stations_{datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
-        dim_df.coalesce(1) \
-            .write.format("csv") \
-            .option("header", "true") \
-            .mode("overwrite") \
-            .save(dim_filename)
-        logging.info(f"Dimension table CSV saved successfully as {dim_filename}")
+    fact_df.printSchema()
+    dim_df.printSchema()
 
-    # Save fact DataFrame to CSV
-    fact_filename = f"fact_bike_availability_{datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv"
-    fact_df.coalesce(1) \
-        .write.format("csv") \
-        .option("header", "true") \
-        .mode("overwrite") \
-        .save(fact_filename)
-    logging.info(f"Fact table CSV saved successfully as {fact_filename}")
+    create_or_update_table(f"{dataset_id}.fact_table", fact_schema)
+    create_or_update_table(f"{dataset_id}.dim_table", dim_schema)
 
-    return fact_filename
+    # Fetch the schema from BigQuery to validate it with DataFrame
+    table = bq_client.get_table(f"{dataset_id}.fact_table")
+    table_schema = [field.name for field in table.schema]
+
+    if validate_schema(fact_df.schema.names, table_schema):
+        fact_df.write \
+            .format("bigquery") \
+            .option("table", f"{dataset_id}.fact_table") \
+            .option("writeMethod", "direct") \
+            .option("autodetect", "true") \
+            .mode("append") \
+            .save()
+
+        logging.info(f"Inserted {fact_df.count()} rows into {dataset_id}.fact_table.")
+
+    if dim_df:
+        dim_df.write \
+            .format("bigquery") \
+            .option("table", f"{dataset_id}.dim_table") \
+            .option("writeMethod", "direct") \
+            .mode("append") \
+            .save()
+
+        logging.info(f"Inserted {dim_df.count()} rows into {dataset_id}.dim_table.")
 
 
 def load_cached_dim_data():
     if os.path.exists("dim_stations.csv"):
         spark = SparkSession.builder.appName("BikeStationDataProcessing").getOrCreate()
         dim_df = spark.read.format("csv").option("header", "true").load("dim_stations.csv")
-        cached_dim_data = set(dim_df.select("id").rdd.flatMap(lambda x: x).collect())
+        cached_dim_data = set(dim_df.select("station_id").rdd.flatMap(lambda x: x).collect())
         logging.info(f"Loaded {len(cached_dim_data)} station IDs from the dimension table.")
     else:
         cached_dim_data = set()
@@ -117,10 +195,13 @@ def load_cached_dim_data():
 
 
 def main():
+    dataset_id = "taipei-bike-data-project.bike_big_query"
+
+    # Fetch and process the data
     data = fetch_bike_data()
     if data:
-        cached_dim_data = load_cached_dim_data()
-        process_bike_data(data, cached_dim_data)
+        cached_dim_data = load_cached_dim_data()  # Optional if you keep using the local cache
+        process_bike_data(data, cached_dim_data, dataset_id)
 
 
 if __name__ == "__main__":
