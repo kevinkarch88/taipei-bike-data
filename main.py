@@ -142,18 +142,12 @@ def process_bike_data(data, cached_dim_data, dataset_id):
                 station_id, latitude, longitude, english_name, english_district, english_address
             ))
 
-            # Log the new station
-            logging.info(f"New station found: {english_name} at {datetime.datetime.utcnow()}")
-
     # Convert lists to Spark DataFrames using the Spark schema
     fact_df = spark.createDataFrame(fact_data_list, schema=spark_fact_schema)
     dim_df = spark.createDataFrame(dim_data_list, schema=spark_dim_schema) if dim_data_list else None
 
     fact_df.printSchema()
     dim_df.printSchema()
-
-    create_or_update_table(f"{dataset_id}.fact_table", fact_schema)
-    create_or_update_table(f"{dataset_id}.dim_table", dim_schema)
 
     # Fetch the schema from BigQuery to validate it with DataFrame
     table = bq_client.get_table(f"{dataset_id}.fact_table")
@@ -196,6 +190,8 @@ def load_cached_dim_data():
 
 def main():
     dataset_id = "taipei-bike-data-project.bike_big_query"
+
+    create_or_update_dataset(dataset_id)
 
     # Fetch and process the data
     data = fetch_bike_data()
