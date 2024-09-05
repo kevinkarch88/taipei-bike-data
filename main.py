@@ -161,10 +161,6 @@ def process_bike_data(data, cached_dim_data, dataset_id):
     fact_df = spark.createDataFrame(fact_data_list, schema=spark_fact_schema)
     dim_df = spark.createDataFrame(dim_data_list, schema=spark_dim_schema) if dim_data_list else None
 
-    fact_df.printSchema()
-    if dim_df:
-        dim_df.printSchema()
-
     # Fetch the schema from BigQuery to validate it with DataFrame
     table = bq_client.get_table(f"{dataset_id}.fact_table")
     table_schema = [field.name for field in table.schema]
