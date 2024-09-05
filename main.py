@@ -96,6 +96,18 @@ def create_spark_schema():
     return fact_schema, dim_schema
 
 
+def fetch_existing_station_ids(dataset_id):
+    query = f"SELECT station_id FROM `{dataset_id}.dim_table`"
+
+    query_job = bq_client.query(query)
+    results = query_job.result()
+
+    station_ids = {row['station_id'] for row in results}
+
+    logging.info(f"Fetched {len(station_ids)} station IDs from BigQuery.")
+    return station_ids
+
+
 def process_bike_data(data, cached_dim_data, dataset_id):
     spark = SparkSession.builder \
         .appName("BikeStationDataProcessing") \
@@ -115,6 +127,8 @@ def process_bike_data(data, cached_dim_data, dataset_id):
     fact_data_list = []
     dim_data_list = []
 
+    existing_station_ids = fetch_existing_station_ids(dataset_id)
+
     for station in data['network']['stations']:
         station_id = station.get("id")
 
@@ -128,8 +142,7 @@ def process_bike_data(data, cached_dim_data, dataset_id):
 
         fact_data_list.append((station_id, timestamp, free_bikes, empty_slots))
 
-        # Dimension table data (only for new stations)
-        if station_id not in cached_dim_data:
+        if station_id not in existing_station_ids:
             latitude = round(station.get("latitude", 0.0), 4)
             longitude = round(station.get("longitude", 0.0), 4)
             extra = station.get("extra", {})
@@ -142,12 +155,15 @@ def process_bike_data(data, cached_dim_data, dataset_id):
                 station_id, latitude, longitude, english_name, english_district, english_address
             ))
 
+            logging.info(f"New station found: {english_name}")
+
     # Convert lists to Spark DataFrames using the Spark schema
     fact_df = spark.createDataFrame(fact_data_list, schema=spark_fact_schema)
     dim_df = spark.createDataFrame(dim_data_list, schema=spark_dim_schema) if dim_data_list else None
 
     fact_df.printSchema()
-    dim_df.printSchema()
+    if dim_df:
+        dim_df.printSchema()
 
     # Fetch the schema from BigQuery to validate it with DataFrame
     table = bq_client.get_table(f"{dataset_id}.fact_table")
@@ -173,6 +189,8 @@ def process_bike_data(data, cached_dim_data, dataset_id):
             .save()
 
         logging.info(f"Inserted {dim_df.count()} rows into {dataset_id}.dim_table.")
+    else:
+        logging.info(f"No new rows inserted into {dataset_id}.dim_table.")
 
 
 def load_cached_dim_data():
