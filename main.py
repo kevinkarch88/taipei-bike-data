@@ -11,10 +11,6 @@ import sys
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s - %(funcName)s - %(lineno)d', datefmt='%H:%M:%S')
 
-# Spark needs to use the right Python version
-os.environ['PYSPARK_PYTHON'] = sys.executable
-os.environ['PYSPARK_DRIVER_PYTHON'] = sys.executable
-
 bq_client = bigquery.Client()
 
 
