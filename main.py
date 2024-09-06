@@ -6,8 +6,6 @@ import datetime
 import requests
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType, TimestampType, IntegerType
-import os
-import sys
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s - %(funcName)s - %(lineno)d', datefmt='%H:%M:%S')
 
