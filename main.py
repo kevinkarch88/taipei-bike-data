@@ -108,7 +108,7 @@ def fetch_existing_station_ids(dataset_id):
     return station_ids
 
 
-def process_bike_data(data, cached_dim_data, dataset_id):
+def process_bike_data(data, dataset_id):
     spark = SparkSession.builder \
         .appName("BikeStationDataProcessing") \
         .config("spark.jars.packages", "com.google.cloud.spark:spark-bigquery-with-dependencies_2.12:0.30.0") \
@@ -189,19 +189,6 @@ def process_bike_data(data, cached_dim_data, dataset_id):
         logging.info(f"No new rows inserted into {dataset_id}.dim_table.")
 
 
-def load_cached_dim_data():
-    if os.path.exists("dim_stations.csv"):
-        spark = SparkSession.builder.appName("BikeStationDataProcessing").getOrCreate()
-        dim_df = spark.read.format("csv").option("header", "true").load("dim_stations.csv")
-        cached_dim_data = set(dim_df.select("station_id").rdd.flatMap(lambda x: x).collect())
-        logging.info(f"Loaded {len(cached_dim_data)} station IDs from the dimension table.")
-    else:
-        cached_dim_data = set()
-        logging.info("No existing dimension data found. Starting fresh.")
-
-    return cached_dim_data
-
-
 def main():
     dataset_id = "taipei-bike-data-project.bike_big_query"
 
@@ -210,8 +197,7 @@ def main():
     # Fetch and process the data
     data = fetch_bike_data()
     if data:
-        cached_dim_data = load_cached_dim_data()  # Optional if you keep using the local cache
-        process_bike_data(data, cached_dim_data, dataset_id)
+        process_bike_data(data, dataset_id)
 
 
 if __name__ == "__main__":
