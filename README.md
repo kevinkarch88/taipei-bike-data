@@ -33,7 +33,10 @@ gcloud dataproc clusters create my-cluster \
 
 Create cloud function with program in /cloud_functions
 Setup scheduler with the endpoint from the cloud function
+pip3 install dbt-bigquery
+dbt run
+dbt test
 
 
 # GCP Next Steps [DRAFT]
-Queries & Transformations (DBT)
+More queries/tests/transformations (DBT)
