@@ -1,0 +1,21 @@
+version: 2
+
+models:
+  - name: average_usage
+    description: "Analyzes bike usage percentage per station and ranks stations by usage"
+    columns:
+      - name: station_id
+        description: "Unique identifier for the bike station"
+        tests:
+          - unique
+          - not_null
+
+      - name: avg_usage_percentage
+        description: "Percentage of slots filled"
+        tests:
+          - not_null
+
+      - name: station_name
+        description: "Name of the bike station"
+        tests:
+          - not_null
