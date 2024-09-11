@@ -2,20 +2,39 @@ version: 2
 
 models:
   - name: average_usage
-    description: "Analyzes bike usage percentage per station and ranks stations by usage"
+    description: "Analyzes bike usage percentage per station and ranks stations by usage."
     columns:
       - name: station_id
-        description: "Unique identifier for the bike station"
+        description: "Unique identifier for the bike station."
         tests:
           - unique
           - not_null
 
       - name: avg_usage_percentage
-        description: "Percentage of slots filled"
+        description: "Percentage of slots filled."
         tests:
           - not_null
 
       - name: station_name
-        description: "Name of the bike station"
+        description: "Name of the bike station."
+        tests:
+          - not_null
+
+  - name: bike_change
+    description: "Analyzes the changes in bike availability at stations over time using window functions."
+    columns:
+      - name: station_id
+        description: "Unique identifier for the bike station."
+        tests:
+          - unique
+          - not_null
+
+      - name: station_name
+        description: "Name of the bike station."
+        tests:
+          - not_null
+
+      - name: avg_change_in_free_bikes
+        description: "The average change in bike availability at each station."
         tests:
           - not_null
