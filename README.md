@@ -13,7 +13,14 @@ The fact table has the updated status of the bike with primary key station_id, t
 Python 3.8+
 Spark, GCP
 
-# Setup [DRAFT]
+# Testing
+To run all tests in the Python code, just enter 'pytest'
+To run an individual test do 'pytest test_main.py::test_fetch_bike_data'
+
+To run all dbt tests, enter 'dbt test'
+To run one dbt test, do 'dbt test --select average-usage'
+
+# Setup
 Make sure the requirements file has all the packages you need. Install them with:
 pip3 install -r requirements.txt
 Note: Make sure to use 'pip3' in gcloud or you might just install the dependencies for Python2 and waste an hour trying to figure out what went wrong.
@@ -38,5 +45,3 @@ dbt run
 dbt test
 
 
-# GCP Next Steps [DRAFT]
-More queries/tests/transformations (DBT)
