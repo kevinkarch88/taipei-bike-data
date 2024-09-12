@@ -1,17 +1,26 @@
-# Taipei YouBike Data Pipeline
+# Introduction
 
-This project is a pipeline for processing and analyzing bike station data from the Taipei YouBike system, sourced from the CityBikes API.
+This project provides instructions for how to create an end-to-end data engineering pipeline to collect, process, and analyze real-time data from the Taipei YouBike system using GCP services. 
+The data used for this project, and data for city-wide bike systems around the world, is available thanks to the CityBikes API at https://api.citybik.es/v2/networks.
 The pipeline uses Pyspark for data processing, BigQuery for storage, DataProc for running Spark jobs, Cloud Functions and Scheduler for orchestration, and dbt for transformations.
+
+# Prerequisites
+
+Python 3.8+
+Spark 
+GCP account
+dbt
 
 # Architecture
 Two tables are used to store the data.
 The dimension table has the information about each individual station with primary key station_id, longitude, latitude, name, district, and address.
 The fact table has the updated status of the bike with primary key station_id, timestamp, free_bikes, and empty_slots.
 
-# Prerequisites
-
-Python 3.8+
-Spark, GCP
+The data is processed in the following steps:
+1. Ingestion: Data is pulled from the CityBikes API and ingested into BigQuery with Python and pyspark.
+2. Processing: Pyspark on DataProc loads the data into BigQuery.
+3. Orchestration: Cloud Scheduler triggers Cloud Functions to execute the DataProc job on a schedule.
+4. Transformation: DBT is used for transformation and querying the data for analysis.
 
 # Testing
 To run all tests in the Python code, just enter 'pytest'
@@ -23,7 +32,18 @@ To run one dbt test, do 'dbt test --select average-usage'
 # Setup
 Make sure the requirements file has all the packages you need. Install them with:
 pip3 install -r requirements.txt
-Note: Make sure to use 'pip3' in gcloud or you might just install the dependencies for Python2 and waste an hour trying to figure out what went wrong.
+Note: Make sure to use 'pip3' in gcloud or you might just install the dependencies for Python2 by mistake!
+
+Set the project. I named mine "taipei-bike-data-project".
+gcloud config set project taipei-bike-data-project
+
+Put the files from this repo into your GCP file system or just checkout the repo in GCP.
+
+Enable these APIs now before you move on. They might take a few minutes to be available:
+BigQuery API
+Cloud Dataproc API
+Cloud Functions API
+Cloud Scheduler API
 
 Create a bucket and put your files in there.
 gsutil mb gs://taipei-bike-bucket/
@@ -38,10 +58,36 @@ gcloud dataproc clusters create my-cluster \
     --image-version=2.0-debian10 \
     --project=taipei-bike-data-project
 
-Create cloud function with program in /cloud_functions
-Setup scheduler with the endpoint from the cloud function
-pip3 install dbt-bigquery
+Run Spark job with needed dependency
+gcloud dataproc jobs submit pyspark gs://taipei-bike-bucket/main.py \
+    --cluster=my-cluster \
+    --region=us-central1 \
+    --jars=gs://spark-lib/bigquery/spark-bigquery-with-dependencies_2.12-0.30.0.jar \
+    -- \
+    --project=taipei-bike-dataproject
+
+Setup the Cloud Function
+gcloud functions deploy submit_dataproc_job \
+  --runtime python310 \
+  --trigger-http \
+  --allow-unauthenticated \
+  --entry-point submit_dataproc_job
+
+Setup the scheduler (runs every minute)
+gcloud scheduler jobs create http submit-dataproc-job-scheduler \
+  --schedule="* * * * *" \
+  --http-method=POST \
+  --uri=https:/us-central1.cloudfunctions.net/submit_dataproc_job \
+  --time-zone="America/New_York" \
+  --location=us-central1 \
+  --message-body="{}"
+
+To run the dbt models:
+dbt init taipei-bike-project
 dbt run
-dbt test
 
+# dbt Models
 
+1. average_usage.sql aggregates data on bike usage per station. It calculates the average percentage of empty slots (bike usage) for each station and ranks stations based on their average usage over time.
+2. bike_change.sql calculates the average change in the number of free bikes at each station between updates. It ranks stations by how much their availability fluctuates, providing insights into stations with high or low variability in bike availability.
+3. district_std_dev.sql calculates the standard deviation of bike and slot availability for each district, allowing you to identify which districts have more stable or more variable bike-sharing services.
