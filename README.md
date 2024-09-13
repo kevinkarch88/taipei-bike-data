@@ -91,3 +91,27 @@ dbt run
 1. average_usage.sql aggregates data on bike usage per station. It calculates the average percentage of empty slots (bike usage) for each station and ranks stations based on their average usage over time.
 2. bike_change.sql calculates the average change in the number of free bikes at each station between updates. It ranks stations by how much their availability fluctuates, providing insights into stations with high or low variability in bike availability.
 3. district_std_dev.sql calculates the standard deviation of bike and slot availability for each district, allowing you to identify which districts have more stable or more variable bike-sharing services.
+
+# Run-through
+
+Put the pyspark program and requirements in your bucket
+![bucket](screenshots/cloud_storage.png)
+
+Setup the cloud function
+![cf](screenshots/cloud_run_function.png)
+
+Setup cloud run scheduler
+![crs](screenshots/cloud_run_scheduler.png)
+
+Make sure the scheduler is running in the cloud function metrics tab.
+![cfm](screenshots/cloud_run_function_metrics.png)
+
+Query your dimension and fact table in BigQuery
+![dt](screenshots/dim_table.png)
+![ft](screenshots/fact_table.png)
+
+Run your dbt models and check out the results.
+![ft](screenshots/dbt_avg_bike_change.png)
+![ft](screenshots/dbt_avg_usage.png)
+![ft](screenshots/dbt_std_dev.png)
+
