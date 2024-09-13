@@ -17,7 +17,7 @@ WITH bike_change AS (
     SELECT
         station_id,
         station_name,
-        AVG(ABS(change_in_free_bikes)) AS avg_change_in_free_bikes
+        ROUND(AVG(ABS(change_in_free_bikes)), 2) AS avg_change_in_free_bikes
     FROM
         bike_change
     WHERE
@@ -34,4 +34,3 @@ FROM
     average_change
 ORDER BY
     avg_change_in_free_bikes DESC
-
