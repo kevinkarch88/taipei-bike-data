@@ -20,7 +20,7 @@ WITH usage_data AS (
     SELECT
         station_id,
         station_name,
-        AVG(bike_usage_percentage) AS avg_usage_percentage
+        ROUND(AVG(bike_usage_percentage), 2) AS avg_usage_percentage
     FROM
         usage_data
     GROUP BY
@@ -35,4 +35,3 @@ FROM
     average_usage
 ORDER BY
     avg_usage_percentage DESC
-LIMIT 10000

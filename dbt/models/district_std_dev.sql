@@ -34,4 +34,3 @@ FROM
     district_variability
 ORDER BY
     bike_availability_stddev DESC
-LIMIT 1000

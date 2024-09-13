@@ -34,4 +34,4 @@ FROM
     average_change
 ORDER BY
     avg_change_in_free_bikes DESC
-LIMIT 1000
+
