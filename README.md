@@ -111,7 +111,11 @@ Query your dimension and fact table in BigQuery
 ![ft](screenshots/fact_table.png)
 
 Run your dbt models and check out the results.
+Highest average changes in available bikes
 ![ft](screenshots/dbt_avg_bike_change.png)
+Lowest percent bike usage
 ![ft](screenshots/dbt_avg_usage.png)
+Busiest stations (by standard deviation)
 ![ft](screenshots/dbt_std_dev.png)
-
+Closest stations to Din Tai Fung (geospatial query)
+![ft](screenshots/dbt_closest_station.png)
