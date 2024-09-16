@@ -62,3 +62,22 @@ models:
         description: "The number of stations in the district."
         tests:
           - not_null
+
+  - name: closest_bike_stations
+    description: "Finds the closest bike stations to Din Tai Fung (the greatest restaurant)."
+    columns:
+      - name: station_id
+        description: "Unique identifier for the bike station."
+        tests:
+          - unique
+          - not_null
+
+      - name: station_name
+        description: "The name of the bike station."
+        tests:
+          - not_null
+
+      - name: distance_in_meters
+        description: "The distance from the restaurant to the bike station in meters."
+        tests:
+          - not_null
