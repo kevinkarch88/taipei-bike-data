@@ -43,7 +43,7 @@ def create_bigquery_schema():
 
 
 def fetch_bike_data():
-    url = "https://api.citybik.es/v2/networks/youbike-new-taipei"
+    url = "https://api.citybik.es/v2/networks/youbike-taipei"
     response = requests.get(url)
     if response.status_code == 200:
         logging.info("Data fetched successfully.")
