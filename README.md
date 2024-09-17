@@ -50,6 +50,7 @@ gsutil mb gs://taipei-bike-bucket/
 gsutil cp main.py gs://taipei-bike-bucket/
 
 Create your dataproc cluster (min size is now 30gb)
+
 gcloud dataproc clusters create my-cluster \
     --region=us-central1 \
     --single-node \
@@ -59,23 +60,25 @@ gcloud dataproc clusters create my-cluster \
     --project=taipei-bike-data-project
 
 Run Spark job with needed dependency
+
 gcloud dataproc jobs submit pyspark gs://taipei-bike-bucket/main.py \
     --cluster=my-cluster \
     --region=us-central1 \
     --jars=gs://spark-lib/bigquery/spark-bigquery-with-dependencies_2.12-0.30.0.jar \
-    -- \
     --project=taipei-bike-dataproject
 
 Setup the Cloud Function
+
 gcloud functions deploy submit_dataproc_job \
   --runtime python310 \
   --trigger-http \
   --allow-unauthenticated \
   --entry-point submit_dataproc_job
 
-Setup the scheduler (runs every minute)
+Setup the scheduler (runs at night in EST)
+
 gcloud scheduler jobs create http submit-dataproc-job-scheduler \
-  --schedule="* * * * *" \
+  --schedule="*/15 0-7,20-23 * * *" \
   --http-method=POST \
   --uri=https:/us-central1.cloudfunctions.net/submit_dataproc_job \
   --time-zone="America/New_York" \
