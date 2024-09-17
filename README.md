@@ -13,14 +13,16 @@ dbt
 
 # Architecture
 Two tables are used to store the data.
-The dimension table has the information about each individual station with primary key station_id, longitude, latitude, name, district, and address.
-The fact table has the updated status of the bike with primary key station_id, timestamp, free_bikes, and empty_slots.
+The dimension table has the information about each individual station with columns station_id, longitude, latitude, name, district, and address.
+The fact table has the updated status of the bike with columns station_id, timestamp, free_bikes, and empty_slots.
 
 The data is processed in the following steps:
 1. Ingestion: Data is pulled from the CityBikes API and ingested into BigQuery with Python and pyspark.
 2. Processing: Pyspark on DataProc loads the data into BigQuery.
 3. Orchestration: Cloud Scheduler triggers Cloud Functions to execute the DataProc job on a schedule.
 4. Transformation: DBT is used for transformation and querying the data for analysis.
+
+![cf](screenshots/drawio.png)
 
 # Testing
 To run all tests in the Python code, just enter 'pytest'
