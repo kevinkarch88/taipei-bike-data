@@ -2,7 +2,7 @@
 
 This project provides instructions for how to create an end-to-end data engineering pipeline to collect, process, and analyze real-time data from the Taipei YouBike system using GCP services. 
 The data used for this project, and data for city-wide bike systems around the world, is available thanks to the CityBikes API at https://api.citybik.es/v2/networks.
-The pipeline uses Pyspark for data processing, BigQuery for storage, DataProc for running Spark jobs, Cloud Functions and Scheduler for orchestration, and dbt for transformations.
+The pipeline uses Pyspark for data processing, BigQuery for storage, DataProc for running Spark jobs, Cloud Composer/Airflow for orchestration, and dbt for transformations.
 
 # Prerequisites
 
@@ -17,12 +17,12 @@ The dimension table has the information about each individual station with colum
 The fact table has the updated status of the bike with columns station_id, timestamp, free_bikes, and empty_slots.
 
 The data is processed in the following steps:
-1. Ingestion: Data is pulled from the CityBikes API and ingested into BigQuery with Python and pyspark.
-2. Processing: Pyspark on DataProc loads the data into BigQuery.
-3. Orchestration: Cloud Scheduler triggers Cloud Functions to execute the DataProc job on a schedule.
-4. Transformation: DBT is used for transformation and querying the data for analysis.
+1. Ingestion: Data is pulled from the CityBikes API using a Python task in Airflow. The data is processed with PySpark and saved into BigQuery
+2. Processing: The PySpark job is submitted to Google Cloud Dataproc.
+3. Orchestration: Airflow (Cloud Composer) will orchestrate the entire workflow. The DAG will be scheduled to run every 15 minutes between 8 PM and 8 AM.
+4. Transformation: dbt transforms and queries the data for analysis.
 
-![cf](screenshots/drawio.png)
+![cf](screenshots/workflow.png)
 
 # Testing
 To run all tests in the Python code, just enter 'pytest'
@@ -44,8 +44,7 @@ Put the files from this repo into your GCP file system or just checkout the repo
 Enable these APIs now before you move on. They might take a few minutes to be available:
 BigQuery API
 Cloud Dataproc API
-Cloud Functions API
-Cloud Scheduler API
+Cloud Composer
 
 Create a bucket and put your files in there.
 gsutil mb gs://taipei-bike-bucket/
@@ -69,23 +68,18 @@ gcloud dataproc jobs submit pyspark gs://taipei-bike-bucket/main.py \
     --jars=gs://spark-lib/bigquery/spark-bigquery-with-dependencies_2.12-0.30.0.jar \
     --project=taipei-bike-dataproject
 
-Setup the Cloud Function
+Setup Cloud Composer
 
-gcloud functions deploy submit_dataproc_job \
-  --runtime python310 \
-  --trigger-http \
-  --allow-unauthenticated \
-  --entry-point submit_dataproc_job
+gcloud composer environments create taipei-bike-env \
+    --location us-central1 \
+    --zone us-central1-a \
+    --machine-type n1-standard-2 \
+    --node-count 3 \
+    --disk-size 100 \
+    --python-version 3 \
+    --image-version composer-2.0.25-airflow-2.3.3
 
-Setup the scheduler (runs at night in EST)
-
-gcloud scheduler jobs create http submit-dataproc-job-scheduler \
-  --schedule="*/15 0-7,20-23 * * *" \
-  --http-method=POST \
-  --uri=https:/us-central1.cloudfunctions.net/submit_dataproc_job \
-  --time-zone="America/New_York" \
-  --location=us-central1 \
-  --message-body="{}"
+Add the requirements from the requirements.txt folder to Cloud Composer.
 
 To run the dbt models:
 dbt init taipei-bike-project
@@ -96,20 +90,15 @@ dbt run
 1. average_usage.sql aggregates data on bike usage per station. It calculates the average percentage of empty slots (bike usage) for each station and ranks stations based on their average usage over time.
 2. bike_change.sql calculates the average change in the number of free bikes at each station between updates. It ranks stations by how much their availability fluctuates, providing insights into stations with high or low variability in bike availability.
 3. district_std_dev.sql calculates the standard deviation of bike and slot availability for each district, allowing you to identify which districts have more stable or more variable bike-sharing services.
+4. closest_stations.sql find the closest stations to the best restaurant in the world, Din Tai Fung, using geolocation data.
 
-# Run-through
+# Manual Run-through
 
 Put the pyspark program and requirements in your bucket
 ![bucket](screenshots/cloud_storage.png)
 
-Setup the cloud function
-![cf](screenshots/cloud_run_function.png)
-
-Setup cloud run scheduler
-![crs](screenshots/cloud_run_scheduler.png)
-
-Make sure the scheduler is running in the cloud function metrics tab.
-![cfm](screenshots/cloud_run_function_metrics.png)
+Start the cloud composer DAG
+![cc](screenshots/cloud_composer.png)
 
 Query your dimension and fact table in BigQuery
 ![dt](screenshots/dim_table.png)
