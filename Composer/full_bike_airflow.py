@@ -80,5 +80,4 @@ run_dbt_models = BashOperator(
 
 # Task dependencies within the same DAG
 # download main and tests, run tests, do spark job every 15 minutes, run dbt models once
-[download_test_main, download_main_py] >> run_test_task
-submit_spark_job >> run_dbt_models
+[download_test_main, download_main_py] >> run_test_task >> submit_spark_job >> run_dbt_models
