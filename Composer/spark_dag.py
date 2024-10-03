@@ -1,6 +1,5 @@
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
-from airflow.operators.bash import BashOperator
 from airflow.providers.google.cloud.transfers.gcs_to_local import GCSToLocalFilesystemOperator
 from airflow.providers.google.cloud.operators.dataproc import DataprocSubmitJobOperator
 from datetime import datetime, timedelta
@@ -11,7 +10,7 @@ default_args = {
     'retries': 1
 }
 
-#  single DAG for downloading files, running pytests, running Spark, and running dbt models
+# DAG for downloading, tests, running Spark
 dag = DAG(
     'run_full_bike_pipeline',
     default_args=default_args,
@@ -37,7 +36,6 @@ download_main_py = GCSToLocalFilesystemOperator(
     dag=dag
 )
 
-
 # run test_main.py
 def run_test():
     result = subprocess.run(['python3', '/tmp/test_main.py'], capture_output=True, text=True)
@@ -45,15 +43,13 @@ def run_test():
     if result.returncode != 0:
         raise Exception(f"test_main.py failed: {result.stderr}")
 
-
 run_test_task = PythonOperator(
     task_id='run_test_main_py',
     python_callable=run_test,
     dag=dag
 )
 
-
-# Spark job
+# Define Spark job task in the same DAG with DataprocSubmitJobOperator
 dataproc_job = {
     'placement': {'cluster_name': 'my-cluster'},
     'pyspark_job': {
@@ -71,13 +67,5 @@ submit_spark_job = DataprocSubmitJobOperator(
     dag=dag
 )
 
-# Task to run dbt models located in the specified local directory
-run_dbt_models = BashOperator(
-    task_id='run_dbt_models',
-    bash_command='cd path/to/home/TaipeiBikeData/taipei_bike_project/models/example && dbt run',
-    dag=dag
-)
-
 # Task dependencies within the same DAG
-# download main and tests, run tests, do spark job every 15 minutes, run dbt models once
-[download_test_main, download_main_py] >> run_test_task >> submit_spark_job >> run_dbt_models
+[download_test_main, download_main_py] >> run_test_task >> submit_spark_job
